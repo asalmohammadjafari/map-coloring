@@ -1,79 +1,72 @@
-from collections import deque
-from typing import Callable, List, Tuple
-import random
-import matplotlib.colors as mcolors
+from __future__ import annotations
 
-class CSP(object):
-    """
-    Represents a Constraint Satisfaction Problem (CSP).
+from collections import defaultdict
+from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple
 
-    Attributes:
-        variables (dict): A dictionary that maps variables to their domains.
-        constraints (list): A list of constraints in the form of [constraint_func, *variables].
-        unassigned_var (list): A list of unassigned variables.
-        var_constraints (dict): A dictionary that maps variables to their associated constraints.
+ConstraintFn = Callable[[str, str], bool]
 
-    Methods:
-        add_constraint(constraint_func, variables): Adds a constraint to the CSP.
-        add_variable(variable, domain): Adds a variable to the CSP with its domain.
-    """
 
-    def __init__(self, *args, **kwargs) -> None:
-        """ Initializes the CSP object with its attributes. """
-        self.variables = {}
-        self.constraints = []
-        self.unassigned_var = []
-        self.var_constraints = {}
-        self.assignments = {}
-        self.assignments_number = 0
-        self.complete_domain = None
+class CSP:
+    """Binary-constraint CSP container used by the map-coloring solver."""
 
-    def add_constraint(self, constraint_func: Callable, variables: List[str]) -> None:
-        """ Adds a constraint between two variables. """
-        if variables[0] not in self.var_constraints:
-            self.var_constraints[variables[0]] = [(constraint_func, variables[1])]
-        else:
-            self.var_constraints[variables[0]].append((constraint_func, variables[1]))
-        if variables[1] not in self.var_constraints:
-            self.var_constraints[variables[1]] = [(constraint_func, variables[0])]
-        else:
-            self.var_constraints[variables[1]].append((constraint_func, variables[0]))
+    def __init__(self) -> None:
+        self.variables: List[str] = []
+        self.domains: Dict[str, List[str]] = {}
+        self.neighbors: Dict[str, Set[str]] = defaultdict(set)
+        self.var_constraints: Dict[str, List[Tuple[ConstraintFn, str]]] = defaultdict(list)
+        self.constraints: List[Tuple[str, str]] = []
 
-    def add_variable(self, variable: str, domain: List) -> None:
-        """ Adds a variable to the CSP with its domain. """
-        self.variables[variable] = domain
-        self.complete_domain = domain
+        self.assignments: Dict[str, Optional[str]] = {}
+        self.unassigned_var: List[str] = []
+        self.assignments_number: int = 0
 
-    def assign(self, variable: str, value) -> bool:
-        """ Assigns a value to a variable and checks consistency. """
-        self.assignments[variable] = value
-        self.unassigned_var.remove(variable)
-        self.variables[variable] = [value]
-        return self.is_consistent(variable, value)
+    def add_variable(self, variable: str, domain: Iterable[str]) -> None:
+        """Register a variable with an independent mutable domain list."""
+        domain_list = list(domain)
+        self.variables.append(variable)
+        self.domains[variable] = domain_list
+        self.assignments[variable] = None
 
-    def is_consistent(self, variable: str, value) -> bool:
-        """ Checks if a value assignment violates any constraints. """
-        constraints = self.var_constraints.get(variable, [])
-        if value not in self.variables[variable]:
-            return False
-        if variable not in self.var_constraints:
-            return True  # No constraints, so the assignment is always consistent
-        for constraint in constraints:
-            if not constraint[0](self.assignments[constraint[1]], value):
-                return False
-        return True
-    
-    def is_complete(self) -> bool:
-        """ Checks if all variables have been assigned. """
-        return len(self.unassigned_var) == 0
+    def add_constraint(self, constraint_func: ConstraintFn, variables: List[str]) -> None:
+        """Register an undirected binary constraint between exactly two variables."""
+        if len(variables) != 2:
+            raise ValueError("Only binary constraints are supported.")
+
+        left, right = variables
+        self.var_constraints[left].append((constraint_func, right))
+        self.var_constraints[right].append((constraint_func, left))
+        self.neighbors[left].add(right)
+        self.neighbors[right].add(left)
+
+        # Store both arc directions once for AC-3 queue initialization.
+        if (left, right) not in self.constraints:
+            self.constraints.append((left, right))
+        if (right, left) not in self.constraints:
+            self.constraints.append((right, left))
 
     def is_assigned(self, variable: str) -> bool:
-        """ Checks if a variable has been assigned a value. """
         return self.assignments.get(variable) is not None
 
-    def unassign(self, removed_values_from_domain: List[Tuple[str, any]], variable: str) -> None:
-        """ Unassigns a variable and restores its domain. """
+    def is_complete(self) -> bool:
+        return all(self.assignments[var] is not None for var in self.variables)
+
+    def is_consistent(self, variable: str, value: str) -> bool:
+        """Check if assigning value to variable is consistent with assigned neighbors."""
+        for constraint_fn, neighbor in self.var_constraints.get(variable, []):
+            neighbor_value = self.assignments.get(neighbor)
+            if neighbor_value is None:
+                continue
+            if not constraint_fn(value, neighbor_value):
+                return False
+        return True
+
+    def assign(self, variable: str, value: str) -> None:
+        self.assignments[variable] = value
+        if variable in self.unassigned_var:
+            self.unassigned_var.remove(variable)
+
+    def unassign(self, variable: str) -> None:
         if variable in self.assignments:
             self.assignments[variable] = None
+        if variable not in self.unassigned_var:
             self.unassigned_var.append(variable)
-        self.variables[variable] = self.complete_domain

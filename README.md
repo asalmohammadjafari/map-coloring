@@ -1,50 +1,72 @@
-# 🌍 **Advanced Map Coloring with Neighborhood Awareness**
+# 🗺️ Map Coloring with CSP
 
-This project provides a solution to the **map coloring problem** using **Constraint Satisfaction Problems (CSP)**. The goal is to color continents such that no two adjacent countries share the same color. You can also define the **Neighbourhood-distance** parameter to include neighbors' neighbors, extending adjacency relationships for more complex constraints.
+An extensible implementation of the map coloring problem using **Constraint Satisfaction Problems (CSP)**.
 
-## 🚀 **Installation**
+The solver colors countries so that neighboring regions do not share the same color, with optional heuristics and inference for faster search.
 
-**Recommended Python version: Python 3.10.9**
+## 🧭 Overview
 
-To install dependencies, run:
+This project models map coloring as a binary CSP:
+- Variables: countries
+- Domains: available colors
+- Constraints: adjacent countries must have different colors
+
+Supports neighborhood-distance expansion beyond direct borders.
+
+## ⚙️ Features
+
+- Backtracking search
+- MRV (Minimum Remaining Values) variable selection
+- LCV (Least Constraining Value) value ordering
+- Forward checking with safe domain rollback
+- AC-3 arc consistency propagation
+- Continent-level solving (`Asia`, `Africa`, `America`, `Europe`)
+- Map visualization with country labels
+- Pytest suite for solver correctness and visualization smoke checks
+
+## 🚀 Usage
+
+### 1) Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## 📂 **Contents**
+### 2) Run solver
 
-- **CSP.py**: Defines the `CSP` class to represent the problem and manage variables, constraints, and assignments.
-- **graphics.py**: Functions for visualizing the colored map. 🎨
-- **map_generator.py**: Generates a dictionary of countries and their borders for CSP constraints.
-- **Solver.py**: Contains the `Solver` class with algorithms for **MRV**, **LCV**, and **AC-3** heuristics.
-- **main.py**: The executable to run the program with various parameters.
+```bash
+python main.py -m Europe -mrv -lcv -ac3 -ND 1 -cn 4
+```
 
-## ⚙️ **Parameters**
+### CLI options
 
-- `-m, --map`: Choose the continent (Asia, Africa, America, Europe).
-- `-lcv, --lcv`: Enable the **Least Constraining Value (LCV)** heuristic.
-- `-mrv, --mrv`: Enable the **Minimum Remaining Values (MRV)** heuristic.
-- `-ac3, --arc-consistency`: Enable the **AC-3** algorithm for arc consistency.
-- `-ND, --Neighbourhood-distance`: Set the threshold for neighboring regions' similarity in color (default: `1`).
+- `-m, --map`: continent (`Asia`, `Africa`, `America`, `Europe`) (required)
+- `-mrv, --mrv`: enable MRV
+- `-lcv, --lcv`: enable LCV
+- `-ac3, --arc-consistency`: enable AC-3
+- `-ND, --neighborhood-distance`: adjacency distance threshold (default `1`)
+- `-cn, --color-num`: exact number of colors to use (default `4`)
 
-## 🏃‍♂️ **Running the Code**
+## 💡 Example
 
-### Examples:
-- **Color Asia with LCV and MRV**:
-  ```bash
-  python main.py -m Asia -lcv -mrv
-  ```
+```bash
+python main.py -m Asia -mrv -lcv -ac3
+```
 
-- **Enable Arc-Consistency with LCV and MRV**:
-  ```bash
-  python main.py -m Europe -lcv -mrv -ac3
-  ```
+## 📂 Project Structure
 
-- **Add Neighbourhood-distance** (e.g., `2` for neighbors' neighbors):
-  ```bash
-  python main.py -m Europe -lcv -mrv -ac3 -ND 2
-  ```
+- `main.py`: CLI and solve loop
+- `CSP.py`: CSP state and constraints model
+- `Solver.py`: backtracking, MRV, LCV, forward checking, AC-3
+- `map_generator.py`: builds borders graph from dataset
+- `graphics.py`: map visualization
+- `countries_dataset.csv`: country geometry + neighbor data
+- `tests/`: automated tests
 
-You can also track the number of assignments made during each run to compare algorithm performance. 📊
+## 🧪 Tests
 
+Run:
+
+```bash
+python -m pytest -q
+```
